@@ -46,6 +46,8 @@ public:
 	// Constructor
 	// @param num_particles Number of particles
 	ParticleFilter() : num_particles(0), is_initialized(false) {}
+	
+	ParticleFilter(int M) : num_particles(M), is_initialized(false) {}
 
 	// Destructor
 	~ParticleFilter() {}
@@ -75,10 +77,11 @@ public:
 	/**
 	 * dataAssociation Finds which observations correspond to which landmarks (likely by using
 	 *   a nearest-neighbors data association).
-	 * @param predicted Vector of predicted landmark observations
-	 * @param observations Vector of landmark observations
+	 * @param p Particle whose associations are being updated
+	 * @param predicted Vector of predicated landmark locations in map coordinates based on observations
+	 * @param map_landmarks Vector of map landmark locations
 	 */
-	void dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations);
+	Particle dataAssociation(Particle& p, std::vector<LandmarkObs> predicted, const Map& map_landmarks);
 	
 	/**
 	 * updateWeights Updates the weights for each particle based on the likelihood of the 
