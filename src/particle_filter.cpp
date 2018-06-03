@@ -25,7 +25,6 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 	if (!initialized()) {
-		default_random_engine gen;
 		// Creates a normal (Gaussian) distributions for x, y, and theta.
 		normal_distribution<double> dist_x(x, std[0]);
 		normal_distribution<double> dist_y(y, std[1]);
@@ -47,9 +46,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
 	// TODO: Add measurements to each particle and add random Gaussian noise.
-	default_random_engine gen;
-
-	for (int i = 0; i < num_particles; ++i) {
+	for (unsigned int i = 0; i < particles.size(); ++i) {
 		Particle p = particles.at(i);
 		// Add sensor noise to current particle state
 		// Shouldn't this be control noise instead? Seems inconsistent with the videos and my understanding of the purpose here
@@ -61,8 +58,14 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		p.y = dist_y(gen);
 		p.theta = dist_theta(gen);
 		// Predict location based on bicylce model
-		p.x += (velocity / yaw_rate)*(sin(p.theta + yaw_rate * delta_t) - sin(p.theta));
-		p.y += (velocity / yaw_rate)*(cos(p.theta) - cos(p.theta + yaw_rate * delta_t));
+		if (abs(yaw_rate) > 0.00001) {
+			p.x += (velocity / yaw_rate)*(sin(p.theta + yaw_rate * delta_t) - sin(p.theta));
+			p.y += (velocity / yaw_rate)*(cos(p.theta) - cos(p.theta + yaw_rate * delta_t));
+		}
+		else {
+			p.x += velocity * delta_t * cos(p.theta);
+			p.y += velocity * delta_t * sin(p.theta);
+		}
 		p.theta = p.theta + yaw_rate * delta_t;
 		particles.at(i) = p;
 	}
@@ -113,7 +116,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 	weights.clear();
-	for (int i = 0; i < num_particles; ++i) {
+	for (unsigned int i = 0; i < particles.size(); ++i) {
 		Particle p = particles.at(i);
 		vector<LandmarkObs> predicted; // Observations in map coordinates for Particle p;
 		for (unsigned int j = 0; j < observations.size(); ++j) {
@@ -129,9 +132,16 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		p.weight = 1.0;
 		for (unsigned int j = 0; j < p.associations.size(); ++j) {
 			int id = p.associations.at(j);
-			int k = 0;
+			unsigned int k = 0;
 			Map::single_landmark_s landmark = map_landmarks.landmark_list.at(k);
-			while (id != landmark.id_i) { landmark = map_landmarks.landmark_list.at(++k); }
+			while (id != landmark.id_i) {
+				k++;
+				if (k < map_landmarks.landmark_list.size()) {
+					landmark = map_landmarks.landmark_list.at(k);
+				} else { 
+					break; 
+				}
+			}
 			//cout << p.id << ": " << landmark.id_i << ": " << id << "\t" << p.sense_x.at(j) << "\t" << landmark.x_f <<  endl;
 			p.weight *= (1.0 / (2.0*M_PI)) *
 				exp(-1.0*(pow((p.sense_x.at(j) - landmark.x_f), 2) / (2.0*std_landmark[0] * std_landmark[0]) +
@@ -148,7 +158,6 @@ void ParticleFilter::resample() {
 	// Resample particles with replacement with probability proportional to their weight. 
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
-	default_random_engine gen;
 	discrete_distribution<> d(weights.begin(),weights.end()); // TODO: initializer list from weights
 	vector<Particle> next_particles;
 	for (unsigned int i = 0; i < particles.size(); ++i) {
@@ -157,6 +166,7 @@ void ParticleFilter::resample() {
 		next_particles.push_back(p);
 	}
 	particles = next_particles;
+	// cout << "Particle Count: " << particles.size() << endl;
 	return;
 }
 
